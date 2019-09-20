@@ -17,13 +17,16 @@ from pyzabbix.api import ZabbixAPI
 import sys, argparse
 import time
 import datetime
-
+from datetime import date
+import csv
 
 zabbixServer    = 'http://10.23.2.250/zabbix/'
 zabbixUser      = 'Admin'
 zabbixPass      = 'zabbix'
 
-
+today = date.today()
+d     = today.strftime("%d-%m-%Y")
+filename = "/csvdata/fortigate200d-{}.csv".format(d)
 
 def main(argv):
     parser = argparse.ArgumentParser()
@@ -39,18 +42,29 @@ def main(argv):
 
     fromTimestamp = int(time.mktime(datetime.datetime.strptime(args.f, "%d/%m/%Y %H:%M").timetuple()))
     tillTimestamp = int(time.mktime(datetime.datetime.strptime(args.t, "%d/%m/%Y %H:%M").timetuple()))
+    
 
-    print(tillTimestamp)
     f  = {  'name' : args.I  }
-    items = zapi.item.get(filter=f, host=args.H, output='extend')
+    items = zapi.item.get(filter=f, host=args.H, output='extend' )
 
-    for item in items:
-        print("ItemID: {} - Item: {} - Key: {}".format(item['itemid'], item['name'], item['key_']))
+    with open(filename,'w') as csvFile:
+        csvHeader = ['date','current connections']
+        writer = csv.writer(csvFile)
+        writer.writerow(csvHeader)
 
-        values = zapi.history.get(itemids=item['itemid'], time_from=fromTimestamp, time_till=tillTimestamp, history=item['value_type'])
-        for historyValue in values:
-            currentDate = datetime.datetime.fromtimestamp(int(historyValue['clock'])).strftime('%d/%m/%Y %H:%M:%S')
-            print("{} {} Value: {}".format(historyValue['clock'], currentDate, historyValue['value']))
+        for item in items:
+            #print("ItemID: {} - Item: {} - Key: {}".format(item['itemid'], item['name'], item['key_']))
 
+            values = zapi.history.get(itemids=item['itemid'], time_from=fromTimestamp, time_till=tillTimestamp, history=item['value_type'])
+
+            for historyValue in values:
+                currentDate = datetime.datetime.fromtimestamp(int(historyValue['clock'])).strftime('%d/%m/%Y %H:%M:%S')
+
+                #print("{} {} Value: {}".format(historyValue['clock'], currentDate, historyValue['value']))
+                myData = [currentDate, historyValue['value']]
+                writer.writerow(myData)
+    csvFile.close()
+    print("create csv finished")
 if __name__ == "__main__":
    main(sys.argv[1:])
+
